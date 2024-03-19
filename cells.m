@@ -44,10 +44,6 @@ fprintf('nsevar: %.3f (+/- %.2f) [true=%2.3f]\n', pp.kprs.nsevar, 2*pp.kprspost.
 
 
 %% Compute predictive distribution on a grid
-% error bars
-% information per cell
-% git repository
-% convolve ysamp to smooth
 
 % Make grid of x points (for visualizing function)
 ngrid = 400; % number of grid points
@@ -57,9 +53,6 @@ ngrid = size(xgrid);
 [fgrid,fstd] = compPredDist_GP(xgrid,pp);
 
 subplot(122);
-% 
-% plot(xgrid,fgrid);
-% title('posterior mean');
 
 p1 = plot(xgrid, fgrid, 'linewidth', 3);
 fstd20 = 20*fstd;
@@ -67,21 +60,103 @@ ebregionplot(xgrid,fgrid,fstd20,fstd20);
 title('posterior mean (+/- 20SD)');
 box off;
 
-trial_ms = size(pos,1);
-avg_activity = sum(tc,2)/trial_ms;
-bins = 50;
+%% Compute spatial information I without GPR - don't binarize
+bins = 20;
+total_ms = size(pos,1);
+avg_activity = sum(tc,2)/total_ms;
+bin_activity = zeros(size(tc,1), bins);
 binlen = max(pos)/bins;
-bins_ms = zeros(bins,1);
+bins_ms = zeros(1, bins);
+on_threshold = 3.5*std(tc,0,2);
 
 for i = 1:size(pos)
     if pos(i) >= 0
         binnum = ceil(pos(i) / binlen);
         if binnum == 0
-            binnum = 1
+            binnum = 1;
         end
-        bins_ms(binnum) = bins_ms(binnum)+1;
+        bins_ms(1,binnum) = bins_ms(1,binnum)+1;
+        bin_activity(:,binnum) = bin_activity(:,binnum) + (tc(:,i) > on_threshold);
+        
     end
 end
 
-% for cell = 1:numcells
-%      gp = 
+bin_avgs = bin_activity/total_ms;
+p_bin_k = bins_ms/total_ms;
+
+info_original = zeros(size(tc,1),1);
+for i = 1:size(info_original)
+    r = bin_avgs(i,:)/avg_activity(i);
+    % sometimes a cell has 0 activity in a given bin, can't take log
+    r(r==0) = 1;
+    info_original(i) = sum(p_bin_k.*r.*log2(r));
+end
+
+%% Compute spatial information I with GPR  
+% fit before looping, store gridded posterior/hyperparameters
+% average each larger spatial bin 
+% turn zeros into 1 / nansum
+% if there is high information try shuffling by trial
+
+info_original_GP = zeros(size(tc,1),1);
+for celln = 1:size(tc,1)
+    xsamp = pos;
+    ysamp = tc(celln,:)';
+    pp = fitGPregress_MaxEv(xsamp,ysamp,fdprs);
+    for i = 1:bins
+        bin_points = ((i-1)*binlen:(i*binlen))';
+        [fgrid,fstd] = compPredDist_GP(bin_points,pp);
+        fgrid(fgrid>on_threshold(celln)) = 1;
+        fgrid(fgrid<on_threshold(celln)) = 0;
+        r = mean(fgrid)/avg_activity(celln);
+        if r <= 0
+            r = 1;
+        end
+        info_original_GP(celln) = info_original_GP(celln) + p_bin_k(i).*r.*log2(r);
+    end
+end
+%% Non GP shuffling test
+
+n_shuffles = 500;
+shuffled_distributions = zeros(size(tc,1),n_shuffles);
+bin_activity_shuff = zeros(size(tc,1), bins);
+
+for s=1:n_shuffles
+    tc_shuff = circshift(tc, randi([3,size(pos,1)]), 2);
+    for x = 1:size(pos)
+        if pos(x) >= 0
+            binnum = ceil(pos(i) / binlen);
+            if binnum == 0
+                binnum = 1;
+            end
+            bin_activity_shuff(:,binnum) = ...
+                bin_activity_shuff(:,binnum) + (tc_shuff(:,i) > on_threshold);  
+        end
+    end
+    bin_avgs_shuff = bin_activity_shuff/total_ms;
+    info_shuff = zeros(size(tc_shuff,1),1);
+
+    for i = 1:size(info_shuff)
+        r = bin_avgs_shuff(i,:)/avg_activity(i);
+        r(r==0) = 1;
+        info_shuff(i) = sum(p_bin_k.*r.*log2(r));
+    end
+
+    shuffled_distributions(:,s) = info_shuff;
+end
+
+%% GP shuffling test
+
+%% Plots
+sdists = load("shuffled_distributions").shuffled_distributions;
+scatter((1:500),sdists(1,:))
+
+% ignore pksdis
+% compare no GP 20 bin representation to information captured with the GP
+% plot on the same axes
+% error bars
+% information per cell
+% git repository
+% convolve ysamp to smooth
+% use bins without binarizing
+% make function to compute information per cell
