@@ -78,8 +78,7 @@ for i = 1:size(pos)
             binnum = 1;
         end
         % bins_ms(1,binnum) = bins_ms(1,binnum)+1;
-        bin_activity(:,binnum) = bin_activity(:,binnum) + tc(:,i);
-        
+        bin_activity(:,binnum) = bin_activity(:,binnum) + tc(:,i);   
     end
 end
 
@@ -92,7 +91,8 @@ for i = 1:size(info_original)
     r(r==0) = 1;
     info_original(i) = sum(r.*log2(r));
 end
-p2 = scatter(1:1325,info_original, 10, "filled");
+figure
+scatter(1:1325,info_original, 10, "filled");
 title('Information per cell (unshuffled, no GPR)');
 xlabel("Cell number")
 ylabel("Information (bits)")
@@ -107,12 +107,12 @@ for s=1:n_shuffles
     tc_shuff = circshift(tc, randi([3,size(pos,1)]), 2);
     for x = 1:size(pos)
         if pos(x) >= 0
-            binnum = ceil(pos(i) / binlen);
+            binnum = ceil(pos(x) / binlen);
             if binnum == 0
                 binnum = 1;
             end
             bin_activity_shuff(:,binnum) = ...
-                bin_activity_shuff(:,binnum) + tc_shuff(:,i);  
+                bin_activity_shuff(:,binnum) + tc_shuff(:,x);  
         end
     end
     bin_avgs_shuff = bin_activity_shuff/total_ms;
@@ -126,9 +126,12 @@ for s=1:n_shuffles
     shuffled_distributions(:,s) = info_shuff;
 end
 %% Plot non GP shuffled information
-sdists = load("shuffled.mat").shuffled_distributions;
-scatter((1:500),sdists(61,:), 10, "filled")
-
+sdists = load("shuff.mat").shuffled_distributions;
+figure
+scatter((1:500),sdists(61,:), 10, "red", "filled");
+title('Information for one cell over 500 shuffles (no GPR)');
+xlabel("Shuffle number");
+ylabel("Information (bits)");
 %% Compute spatial information I with GPR  
 % fit before looping, store gridded posterior/hyperparameters
 % average each larger spatial bin 
