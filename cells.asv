@@ -1,12 +1,10 @@
-%% Loading the data
 celldata = load("celldata.mat");
 setpaths;
 tc = celldata.tc(:,1:41756);
 pos = celldata.y(1:41756);
 [numcells, timepoints] = size(tc);
 
-%% GP single-cell example and plot
-celln = 61;
+celln = 2;
 % Set hyperparameters for covariance function 
 kprs.rho = 100; % marginal variance
 kprs.len = 2.5; % length scale
@@ -92,43 +90,10 @@ for i = 1:size(info_original)
     r(r==0) = 1;
     info_original(i) = sum(r.*log2(r));
 end
-p2 = scatter(1:1325,info_original, 10, "filled");
+p2 = plot(info_original);
 title('Information per cell (unshuffled, no GPR)');
 xlabel("Cell number")
 ylabel("Information (bits)")
-
-%% Non GP shuffling test
-
-n_shuffles = 500;
-shuffled_distributions = zeros(size(tc,1),n_shuffles);
-
-for s=1:n_shuffles
-    bin_activity_shuff = zeros(size(tc,1), bins);
-    tc_shuff = circshift(tc, randi([3,size(pos,1)]), 2);
-    for x = 1:size(pos)
-        if pos(x) >= 0
-            binnum = ceil(pos(i) / binlen);
-            if binnum == 0
-                binnum = 1;
-            end
-            bin_activity_shuff(:,binnum) = ...
-                bin_activity_shuff(:,binnum) + tc_shuff(:,i);  
-        end
-    end
-    bin_avgs_shuff = bin_activity_shuff/total_ms;
-    info_shuff = zeros(size(tc_shuff,1),1);
-
-    for i = 1:size(info_shuff)
-        r = bin_avgs_shuff(i,:)/avg_activity(i);
-        r(r==0) = 1;
-        info_shuff(i) = sum(r.*log2(r));
-    end
-    shuffled_distributions(:,s) = info_shuff;
-end
-%% Plot non GP shuffled information
-sdists = load("shuffled.mat").shuffled_distributions;
-scatter((1:500),sdists(61,:), 10, "filled")
-
 %% Compute spatial information I with GPR  
 % fit before looping, store gridded posterior/hyperparameters
 % average each larger spatial bin 
@@ -173,9 +138,41 @@ for celln = 1:size(tc,1)
     cell_gridpts(celln,:) = cell_gridpts(celln) + fgrid;
     
 end
+%% Non GP shuffling test
+
+n_shuffles = 500;
+shuffled_distributions = zeros(size(tc,1),n_shuffles);
+
+for s=1:n_shuffles
+    bin_activity_shuff = zeros(size(tc,1), bins);
+    tc_shuff = circshift(tc, randi([3,size(pos,1)]), 2);
+    for x = 1:size(pos)
+        if pos(x) >= 0
+            binnum = ceil(pos(i) / binlen);
+            if binnum == 0
+                binnum = 1;
+            end
+            bin_activity_shuff(:,binnum) = ...
+                bin_activity_shuff(:,binnum) + (tc_shuff(:,i) > on_threshold);  
+        end
+    end
+    bin_avgs_shuff = bin_activity_shuff/total_ms;
+    info_shuff = zeros(size(tc_shuff,1),1);
+
+    for i = 1:size(info_shuff)
+        r = bin_avgs_shuff(i,:)/avg_activity(i);
+        r(r==0) = 1;
+        info_shuff(i) = sum(r.*log2(r));
+    end
+
+    shuffled_distributions(:,s) = info_shuff;
+end
+
 %% GP shuffling test
 
-%% Notes
+%% Plots
+sdists = load("shuffled_distributions").shuffled_distributions;
+scatter((1:500),sdists(1,:))
 
 % ignore pksdis
 % compare no GP 20 bin representation to information captured with the GP
