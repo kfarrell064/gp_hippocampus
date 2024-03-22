@@ -6,7 +6,7 @@ pos = celldata.y(1:41756);
 [numcells, timepoints] = size(tc);
 
 %% GP single-cell example and plot
-celln = 61;
+celln = 1;
 % Set hyperparameters for covariance function 
 kprs.rho = 100; % marginal variance
 kprs.len = 2.5; % length scale
@@ -68,7 +68,7 @@ total_ms = size(pos,1);
 avg_activity = sum(tc,2)/total_ms;
 bin_activity = zeros(size(tc,1), bins);
 binlen = max(pos)/bins;
-% bins_ms = zeros(1, bins);
+bins_ms = zeros(1, bins);
 % on_threshold = 3.5*std(tc,0,2);
 
 for i = 1:size(pos)
@@ -77,12 +77,12 @@ for i = 1:size(pos)
         if binnum == 0
             binnum = 1;
         end
-        % bins_ms(1,binnum) = bins_ms(1,binnum)+1;
+        bins_ms(1,binnum) = bins_ms(1,binnum)+1;
         bin_activity(:,binnum) = bin_activity(:,binnum) + tc(:,i);   
     end
 end
 
-bin_avgs = bin_activity/total_ms;
+bin_avgs = bin_activity./bins_ms;
 info_original = zeros(size(tc,1),1);
 
 for i = 1:size(info_original)
@@ -98,11 +98,12 @@ xlabel("Cell number")
 ylabel("Information (bits)")
 
 %% Non GP shuffling test
-
+% plot information per cell on the x, y axes to compare them
 n_shuffles = 500;
 shuffled_distributions = zeros(size(tc,1),n_shuffles);
 
 for s=1:n_shuffles
+    bins_ms_shuff = zeros(1, bins);
     bin_activity_shuff = zeros(size(tc,1), bins);
     tc_shuff = circshift(tc, randi([3,size(pos,1)]), 2);
     for x = 1:size(pos)
@@ -111,11 +112,12 @@ for s=1:n_shuffles
             if binnum == 0
                 binnum = 1;
             end
+            bins_ms_shuff(1,binnum) = bins_ms_shuff(1,binnum)+1;
             bin_activity_shuff(:,binnum) = ...
                 bin_activity_shuff(:,binnum) + tc_shuff(:,x);  
         end
     end
-    bin_avgs_shuff = bin_activity_shuff/total_ms;
+    bin_avgs_shuff = bin_activity_shuff./bins_ms_shuff;
     info_shuff = zeros(size(tc_shuff,1),1);
 
     for i = 1:size(info_shuff)
@@ -126,10 +128,11 @@ for s=1:n_shuffles
     shuffled_distributions(:,s) = info_shuff;
 end
 %% Plot non GP shuffled information
-sdists = load("shuff.mat").shuffled_distributions;
+sdists = load("shuffled_nogp.mat").shuffled_distributions;
 figure
-scatter((1:500),sdists(61,:), 10, "red", "filled");
-title('Information for one cell over 500 shuffles (no GPR)');
+scatter((1:500),sdists(celln,:), 10, "red", "filled");
+yline(info_original(celln))
+title("Information for Cell " +celln+" over 500 shuffles (no GPR)");
 xlabel("Shuffle number");
 ylabel("Information (bits)");
 %% Compute spatial information I with GPR  
