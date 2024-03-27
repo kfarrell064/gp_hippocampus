@@ -1,48 +1,41 @@
-%% Loading the data
+setpaths;  % set some necessary path variabls
+
+% Load the data
 celldata = load("celldata.mat");
-setpaths;
-tc = celldata.tc(:,1:41756);
-pos = celldata.y(1:41756);
-[numcells, timepoints] = size(tc);
 
-%% GP single-cell example and plot
-celln = 1;
-% Set hyperparameters for covariance function 
-kprs.rho = 100; % marginal variance
-kprs.len = 2.5; % length scale
-signse = 5; % additive noise
-
-% Sample points for collecting data
-xrnge = [0,400];
-nsamp = timepoints; % number of observations
+nsamp = 41756;  % the number of samples to keep from raw data (why?)
+tc = celldata.tc(:,1:nsamp);  % matrix of single-cell calcium responses
+pos = celldata.y(1:nsamp);  % animal's sampled 1D spatial position over time
 nd = 1; % dimensionality of inputs
-xsamp = pos; % x locations
 
-% Optional: set parameters governing Fourier-domain representation
-fdprs.circinterval = [xrnge(1);xrnge(2)+5*kprs.len]*ones(1,nd);
-fdprs.condthresh = 1e6;  % threshold for cutting off small singular values
-fdprs.minlen = 2; % minimum length scale to consider (set higher for increased speed)
+%% Fit GP model & hyperparamters to the data from a single cell
 
-% Sample function using Fourier representation
-[cdiag,Bsamp] = Krbf_fourier(xsamp,kprs.len,kprs.rho,fdprs);
-nfreq = length(cdiag);
-fsamp = Bsamp*(sqrt(cdiag).*randn(nfreq,1));
-ysamp = tc(celln,:)';
+celln = 1; % set the cell number
+
+% Process input data
+xrnge = [min(pos),max(pos)];
+xx = pos; % x locations
+yy = tc(celln,:)'; % data for a single cell
+
+% Set parameters governing Fourier-domain representation
+fdprs.circinterval = [xrnge(1);xrnge(2)+50];
+fdprs.condthresh = 1e8;  % threshold for cutting off small singular values
+fdprs.minlen = 50; % minimum length scale to consider (set higher for increased speed)
 
 % Plot samples
-subplot(121);
-plot(xsamp,ysamp, '.');
+subplot(221);
+plot(xx,yy, '.');
 title('Cell #61');
 xlabel('Position (cm)'); ylabel('Response');
 
 %% Optimize log-evidence to infer hyperparameters
 
-pp = fitGPregress_MaxEv(xsamp,ysamp,fdprs);
+pp = fitGPregress_MaxEv(xx,yy,fdprs);
 
 fprintf('\nLearned hyperparameters (+/- 2SD):\n----------------------------------\n');
-fprintf('len:    %.2f  (+/- %.2f) [true=%2.1f]\n', pp.kprs.len, 2*pp.kprspost.CI(1),kprs.len);
-fprintf('rho:    %.2f  (+/- %.2f) [true=%2.1f]\n', pp.kprs.rho, 2*pp.kprspost.CI(2),kprs.rho);
-fprintf('nsevar: %.3f (+/- %.2f) [true=%2.3f]\n', pp.kprs.nsevar, 2*pp.kprspost.CI(3),signse.^2);
+fprintf('len:    %.2f  (+/- %.2f)\n', pp.kprs.len, 2*pp.kprspost.CI(1));
+fprintf('rho:    %.2f  (+/- %.2f)\n', pp.kprs.rho, 2*pp.kprspost.CI(2));
+fprintf('nsevar: %.3f (+/- %.2f)\n', pp.kprs.nsevar, 2*pp.kprspost.CI(3));
 
 
 %% Compute predictive distribution on a grid
@@ -52,6 +45,10 @@ ngrid = 400; % number of grid points
 dx = diff(xrnge)/ngrid; % grid spacing
 xgrid = (xrnge(1)+dx/2:dx:xrnge(2))'; % grid points
 ngrid = size(xgrid);
+
+if (pp.kprs.len < fdprs.minlen)
+    pp.kprs.len = fdprs.minlen;
+end
 [fgrid,fstd] = compPredDist_GP(xgrid,pp);
 
 subplot(122);
@@ -158,16 +155,16 @@ for celln = 1:size(tc,1)
     xrnge = [0,400];
     nsamp = timepoints; % number of observations
     nd = 1; % dimensionality of inputs
-    xsamp = pos; % x locations
+    xx = pos; % x locations
     
     % Optional: set parameters governing Fourier-domain representation
     fdprs.circinterval = [xrnge(1);xrnge(2)+5*kprs.len]*ones(1,nd);
     fdprs.condthresh = 1e6;  % threshold for cutting off small singular values
     fdprs.minlen = 2; % minimum length scale to consider (set higher for increased speed)
     
-    ysamp = tc(celln,:)';
+    yy = tc(celln,:)';
     
-    pp = fitGPregress_MaxEv(xsamp,ysamp,fdprs);
+    pp = fitGPregress_MaxEv(xx,yy,fdprs);
     
     
     % Make grid of x points (for visualizing function)
