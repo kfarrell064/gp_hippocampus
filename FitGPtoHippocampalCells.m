@@ -1,12 +1,18 @@
 setpaths;  % set some necessary path variabls
 
 % Load the data
-celldata = load("celldata.mat");
+celldata = load("fentonlabdata.mat");
 
-nsamp = 41756;  % the number of samples to keep from raw data (why?)
-tc = celldata.tc(:,1:nsamp);  % matrix of single-cell calcium responses
-pos = celldata.y(1:nsamp);  % animal's sampled 1D spatial position over time
-ncells = size(pos,1); % number of cells in dataset
+
+% nsamp = 41756;  % the number of samples to keep from raw data (why?)
+% tc = celldata.tc(:,1:nsamp);  % matrix of single-cell calcium responses
+% pos = celldata.y(1:nsamp);  % animal's sampled 1D spatial position over time
+% ncells = size(pos,1); % number of cells in dataset
+
+nsamp = 6261;  % the number of samples to keep from raw data (why?)
+% tc = celldata.tc(:,1:nsamp);  % matrix of single-cell calcium responses
+% pos = celldata.y(1:nsamp);  % animal's sampled 1D spatial position over time
+% ncells = size(pos,1); % number of cells in dataset
 
 nd = 1; % dimensionality of inputs
 xrnge = [min(pos),max(pos)];  % this is the minimum and maximum x location
@@ -14,8 +20,8 @@ xrnge = [min(pos),max(pos)];  % this is the minimum and maximum x location
 % Set parameters governing Fourier-domain representation
 fdprs.circinterval = [xrnge(1);xrnge(2)+100];
 fdprs.condthresh = 1e8;  % threshold for cutting off small singular values
-fdprs.minlen = 10; % minimum length scale to consider (set higher for increased speed)
-
+fdprs.minlen = 20; % minimum length scale to consider (set higher for increased speed)
+% use min length scale of 20
 
 %% Specify the cell to analyze and plot its raw response data
 
